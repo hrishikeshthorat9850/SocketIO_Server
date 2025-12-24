@@ -12,17 +12,18 @@ const server = http.createServer(app);
 
 const normalize = (url) => url?.replace(/\/$/, "");
 
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL
-      .split(",")
-      .map((o) => normalize(o.trim()))
-  : [
-      "http://localhost:3000",
-      "http:192.168.31.74:3000",
-      "capacitor://localhost",
-      "agropeer://localhost",
-    ];
+// const allowedOrigins = process.env.FRONTEND_URL
+//   ? process.env.FRONTEND_URL
+//       .split(",")
+//       .map((o) => normalize(o.trim()))
+//   : [
+//       "http://localhost:3000",
+//       "http:192.168.31.74:3000",
+//       "capacitor://localhost",
+//       "agropeer://localhost",
+//     ];
 
+const allowedOrigins = "capacitor://localhost" || "agropeer://localhost";
 
 
 const io = new Server(server, {
