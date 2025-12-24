@@ -18,6 +18,7 @@ const allowedOrigins = process.env.FRONTEND_URL
       .map((o) => normalize(o.trim()))
   : [
       "http://localhost:3000",
+      "http:192.168.31.74:3000",
       "capacitor://localhost",
       "agropeer://localhost",
     ];
@@ -25,9 +26,10 @@ const allowedOrigins = process.env.FRONTEND_URL
 
 
 const io = new Server(server, {
+  transports: ["websocket", "polling"],
   cors: {
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Capacitor / native
+      if (!origin) return callback(null, true);
 
       const normalizedOrigin = normalize(origin);
 
@@ -38,10 +40,10 @@ const io = new Server(server, {
       console.log("❌ Blocked CORS origin:", origin);
       callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST"],
     credentials: true,
   },
 });
+
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
