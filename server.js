@@ -23,7 +23,7 @@ const normalize = (url) => url?.replace(/\/$/, "");
 //       "agropeer://localhost",
 //     ];
 
-const allowedOrigins = "http://192.168.31.74:3000" || "capacitor://localhost" || "agropeer://localhost";
+const allowedOrigins = "https://localhost" || "http://localhost:3000" ||  "http://192.168.31.74:3000" || "capacitor://localhost" || "agropeer://localhost";
 
 
 const io = new Server(server, {
