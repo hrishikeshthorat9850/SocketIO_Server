@@ -20,7 +20,7 @@ const allowedOrigins = process.env.FRONTEND_URL
       "https://localhost",
       "http://localhost:3000",
       "http://192.168.31.74:3000",
-      "https://agrogram-wheat.vercel.app"
+      "https://agrogram-wheat.vercel.app",
       "capacitor://localhost",
       "agropeer://localhost",
     ];
