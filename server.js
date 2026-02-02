@@ -393,6 +393,7 @@ io.on("connection", (socket) => {
 
   // 🔨 Clear conversation messages (soft delete messages by setting deleted_at)
   socket.on("clearConversation", async ({ conversation_id, user_id }, callback) => {
+    console.log("[clearConversation] called", { conversation_id, user_id });
     try {
       // Validate conversation and permissions
       const { data: convo, error: convoErr } = await supabase
@@ -443,15 +444,17 @@ io.on("connection", (socket) => {
         }
       });
 
+      console.log("[clearConversation] success, clearedCount:", updatedMsgs?.length || 0);
       callback && callback({ success: true, clearedCount: updatedMsgs?.length || 0 });
     } catch (err) {
-      console.error("❌ Error clearing conversation:", err);
+      console.error("[clearConversation] ❌ Error:", err);
       callback && callback({ error: true, message: "Internal error" });
     }
   });
 
   // 🗑️ Delete conversation (soft-delete conversation and messages)
   socket.on("deleteConversation", async ({ conversation_id, user_id }, callback) => {
+    console.log("[deleteConversation] called", { conversation_id, user_id });
     try {
       // Validate conversation and permissions
       const { data: convo, error: convoErr } = await supabase
@@ -508,44 +511,51 @@ io.on("connection", (socket) => {
         }
       });
 
+      console.log("[deleteConversation] success");
       callback && callback({ success: true });
     } catch (err) {
-      console.error("❌ Error deleting conversation:", err);
+      console.error("[deleteConversation] ❌ Error:", err);
       callback && callback({ error: true, message: "Internal error" });
     }
-git   });
+  });
 
   socket.on("disconnect", () => {
-    const userId = socket.userId;
-    console.log("---- DISCONNECT DEBUG ----");
-    console.log("Socket ID:", socket.id);
-    console.log("User ID on socket:", userId);
-    // Print map in readable form
-    const mapDump = [...userSocketMap.entries()].map(([k, s]) => [k, [...s]]);
-    console.log("All userSocketMap:", JSON.stringify(mapDump));
-    console.log("--------------------------");
+    try {
+      const userId = socket.userId;
+      console.log("[disconnect] ---- DISCONNECT DEBUG ----");
+      console.log("[disconnect] Socket ID:", socket.id, "User ID on socket:", userId);
 
-    if (!userId) return;
+      if (!userId) {
+        console.log("[disconnect] No userId, skipping map cleanup");
+        return;
+      }
 
-    const set = userSocketMap.get(userId);
-    if (!set) return;
+      // Map method is .get() — typo .git causes "ReferenceError: git is not defined"
+      const set = userSocketMap.get(userId);
+      if (!set) {
+        console.log("[disconnect] No socket set for userId:", userId);
+        return;
+      }
 
-    set.delete(socket.id);
+      set.delete(socket.id);
 
-    if (set.size === 0) {
-      userSocketMap.delete(userId);
-
-      io.emit("online-status", {
-        userId,
-        online: false,
-        last_seen: new Date().toISOString(),
-      });
-
-      console.log("🔴 User fully offline:", userId);
-    } else {
-      userSocketMap.set(userId, set);
-      console.log("🟡 User still online via other sockets:", [...set]);
+      if (set.size === 0) {
+        userSocketMap.delete(userId);
+        io.emit("online-status", {
+          userId,
+          online: false,
+          last_seen: new Date().toISOString(),
+        });
+        console.log("[disconnect] 🔴 User fully offline:", userId);
+      } else {
+        userSocketMap.set(userId, set);
+        console.log("[disconnect] 🟡 User still online via other sockets:", [...set]);
+      }
+      console.log("[disconnect] --------------------------");
+    } catch (err) {
+      console.error("[disconnect] ❌ Error in disconnect handler:", err);
     }
+
   });
 
 
@@ -553,6 +563,7 @@ git   });
 });
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log("[server] env check: NODE_ENV=", process.env.NODE_ENV, "FRONTEND_URL present:", !!process.env.FRONTEND_URL);
+});
