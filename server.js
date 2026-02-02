@@ -500,7 +500,7 @@ io.on("connection", (socket) => {
       console.error("❌ Error deleting conversation:", err);
       callback && callback({ error: true, message: "Internal error" });
     }
-  });
+git   });
 
   socket.on("disconnect", () => {
     const userId = socket.userId;
