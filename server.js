@@ -12,18 +12,13 @@ const server = http.createServer(app);
 
 const normalize = (url) => url?.replace(/\/$/, "");
 
-// const allowedOrigins = process.env.FRONTEND_URL
-//   ? process.env.FRONTEND_URL
-//       .split(",")
-//       .map((o) => normalize(o.trim()))
-//   : [
-//       "http://localhost:3000",
-//       "http:192.168.31.74:3000",
-//       "capacitor://localhost",
-//       "agropeer://localhost",
-//     ];
-
-const allowedOrigins = "http://192.168.31.74:3000" || "capacitor://localhost" || "agropeer://localhost";
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://192.168.31.74:3000",
+  "capacitor://localhost",
+  "agropeer://localhost",
+  "https://localhost"
+];
 
 
 const io = new Server(server, {
@@ -120,7 +115,7 @@ io.on("connection", (socket) => {
       io.emit("online-status", {
         userId,
         online: true,
-        last_seen : null
+        last_seen: null
       });
     }
   }
@@ -150,7 +145,7 @@ io.on("connection", (socket) => {
       userActivity.set(userId, {});
     }
     userActivity.get(userId).activeConversation = active ? conversationId : null;
-    
+
     console.log(`📍 User ${userId} active conversation →`, active ? conversationId : "none");
   });
 
@@ -290,7 +285,7 @@ io.on("connection", (socket) => {
       console.error("❌ Error saving message:", err);
     }
   });
-  
+
   socket.on("markAsRead", async ({ conversation_id, reader_id }) => {
     try {
       // Update unread messages for this conversation
@@ -306,7 +301,7 @@ io.on("connection", (socket) => {
 
       if (!updated?.length) {
         console.log("⚠️ No messages updated — maybe all already read");
-        
+
         const { count: unreadCount, error: countError } = await supabase
           .from("messages")
           .select("*", { count: "exact", head: true })
@@ -321,7 +316,7 @@ io.on("connection", (socket) => {
         } else {
           console.log("✅ Unread count fetched successfully:", unreadCount);
         }
-        
+
         io.to(conversation_id).emit("messagesSeen", {
           conversation_id,
           reader_id,
@@ -380,6 +375,130 @@ io.on("connection", (socket) => {
       });
     } catch (err) {
       console.error("❌ Error marking as read:", err);
+    }
+  });
+
+  // 🔨 Clear conversation messages (soft delete messages by setting deleted_at)
+  socket.on("clearConversation", async ({ conversation_id, user_id }, callback) => {
+    try {
+      // Validate conversation and permissions
+      const { data: convo, error: convoErr } = await supabase
+        .from("conversations")
+        .select("user1_id, user2_id")
+        .eq("id", conversation_id)
+        .single();
+
+      if (convoErr || !convo) {
+        console.error("❌ Conversation not found for clearing:", convoErr);
+        callback && callback({ error: true, message: "Conversation not found" });
+        return;
+      }
+
+      const { user1_id, user2_id } = convo;
+      if (user_id !== user1_id && user_id !== user2_id) {
+        callback && callback({ error: true, message: "Unauthorized" });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const { data: updatedMsgs, error: updErr } = await supabase
+        .from("messages")
+        .update({ deleted_at: now })
+        .eq("conversation_id", conversation_id)
+        .select("id");
+
+      if (updErr) throw updErr;
+
+      // Emit to the room so active clients clear UI
+      io.to(conversation_id).emit("conversationCleared", {
+        conversation_id,
+        by_user_id: user_id,
+        cleared_count: updatedMsgs?.length || 0,
+      });
+
+      // Also notify both participants directly (so sidebar updates even if not in room)
+      [user1_id, user2_id].forEach((uid) => {
+        const sockets = userSocketMap.get(uid);
+        if (sockets && sockets.size) {
+          for (const sId of sockets) {
+            io.to(sId).emit("conversationCleared", {
+              conversation_id,
+              by_user_id: user_id,
+              cleared_count: updatedMsgs?.length || 0,
+            });
+          }
+        }
+      });
+
+      callback && callback({ success: true, clearedCount: updatedMsgs?.length || 0 });
+    } catch (err) {
+      console.error("❌ Error clearing conversation:", err);
+      callback && callback({ error: true, message: "Internal error" });
+    }
+  });
+
+  // 🗑️ Delete conversation (soft-delete conversation and messages)
+  socket.on("deleteConversation", async ({ conversation_id, user_id }, callback) => {
+    try {
+      // Validate conversation and permissions
+      const { data: convo, error: convoErr } = await supabase
+        .from("conversations")
+        .select("id, user1_id, user2_id")
+        .eq("id", conversation_id)
+        .single();
+
+      if (convoErr || !convo) {
+        console.error("❌ Conversation not found for deletion:", convoErr);
+        callback && callback({ error: true, message: "Conversation not found" });
+        return;
+      }
+
+      const { user1_id, user2_id } = convo;
+      if (user_id !== user1_id && user_id !== user2_id) {
+        callback && callback({ error: true, message: "Unauthorized" });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const { data: updatedConv, error: convErr } = await supabase
+        .from("conversations")
+        .update({ deleted_at: now })
+        .eq("id", conversation_id)
+        .select("id");
+
+      if (convErr) throw convErr;
+
+      // Soft-delete messages as well
+      const { data: updatedMsgs, error: msgsErr } = await supabase
+        .from("messages")
+        .update({ deleted_at: now })
+        .eq("conversation_id", conversation_id)
+        .select("id");
+
+      if (msgsErr) throw msgsErr;
+
+      // Emit to room and to both participants
+      io.to(conversation_id).emit("conversationDeleted", {
+        conversation_id,
+        by_user_id: user_id,
+      });
+
+      [user1_id, user2_id].forEach((uid) => {
+        const sockets = userSocketMap.get(uid);
+        if (sockets && sockets.size) {
+          for (const sId of sockets) {
+            io.to(sId).emit("conversationDeleted", {
+              conversation_id,
+              by_user_id: user_id,
+            });
+          }
+        }
+      });
+
+      callback && callback({ success: true });
+    } catch (err) {
+      console.error("❌ Error deleting conversation:", err);
+      callback && callback({ error: true, message: "Internal error" });
     }
   });
 
