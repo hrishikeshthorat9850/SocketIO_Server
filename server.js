@@ -482,7 +482,10 @@ io.on("connection", (socket) => {
       }
 
       const { user1_id, user2_id } = convo;
-      if (user_id !== user1_id && user_id !== user2_id) {
+      const uid = user_id != null ? String(user_id) : null;
+      const u1 = user1_id != null ? String(user1_id) : null;
+      const u2 = user2_id != null ? String(user2_id) : null;
+      if (!uid || (uid !== u1 && uid !== u2)) {
         callback && callback({ error: true, message: "Unauthorized" });
         return;
       }
