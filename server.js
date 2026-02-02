@@ -79,6 +79,7 @@ io.on("connection", (socket) => {
         .from("conversations")
         .select("*")
         .or(orFilter)
+        .is("deleted_at", null)
         .order("last_message_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -428,7 +429,11 @@ io.on("connection", (socket) => {
         .eq("conversation_id", conversation_id)
         .select("id");
 
-      if (updErr) throw updErr;
+      if (updErr) {
+        console.error("[clearConversation] DB update error:", updErr.message, updErr.details);
+        throw updErr;
+      }
+      console.log("[clearConversation] DB updated messages count:", updatedMsgs?.length ?? 0);
 
       // Emit to the room so active clients clear UI
       io.to(conversation_id).emit("conversationCleared", {
@@ -489,7 +494,11 @@ io.on("connection", (socket) => {
         .eq("id", conversation_id)
         .select("id");
 
-      if (convErr) throw convErr;
+      if (convErr) {
+        console.error("[deleteConversation] DB update conversations error:", convErr.message, convErr.details);
+        throw convErr;
+      }
+      console.log("[deleteConversation] DB updated conversation:", updatedConv?.length ?? 0);
 
       // Soft-delete messages as well
       const { data: updatedMsgs, error: msgsErr } = await supabase
@@ -498,7 +507,11 @@ io.on("connection", (socket) => {
         .eq("conversation_id", conversation_id)
         .select("id");
 
-      if (msgsErr) throw msgsErr;
+      if (msgsErr) {
+        console.error("[deleteConversation] DB update messages error:", msgsErr.message, msgsErr.details);
+        throw msgsErr;
+      }
+      console.log("[deleteConversation] DB updated messages count:", updatedMsgs?.length ?? 0);
 
       // Emit to room and to both participants
       io.to(conversation_id).emit("conversationDeleted", {
