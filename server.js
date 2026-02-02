@@ -114,7 +114,14 @@ io.on("connection", (socket) => {
     }
   });
 
-  function markUserOnline(userId) {
+  function markUserOnline(payload) {
+    // Accept either (userId) or ({ userId }) so we don't set socket.userId to undefined
+    const userId = typeof payload === "string" ? payload : payload?.userId;
+    if (!userId || typeof userId !== "string" || userId.trim() === "") {
+      console.warn("[registerUser/user-online] Invalid or missing userId, skipping. Payload:", payload);
+      return;
+    }
+
     socket.userId = userId;
 
     const existing = userSocketMap.get(userId) || new Set();
