@@ -402,6 +402,10 @@ io.on("connection", (socket) => {
   // 🔨 Clear conversation messages (soft delete messages by setting deleted_at)
   socket.on("clearConversation", async ({ conversation_id, user_id }, callback) => {
     console.log("[clearConversation] called", { conversation_id, user_id });
+    if (!conversation_id || !user_id) {
+      callback && callback({ error: true, message: "Missing conversation_id or user_id" });
+      return;
+    }
     try {
       // Validate conversation and permissions
       const { data: convo, error: convoErr } = await supabase
@@ -467,6 +471,10 @@ io.on("connection", (socket) => {
   // 🗑️ Delete conversation (soft-delete conversation and messages)
   socket.on("deleteConversation", async ({ conversation_id, user_id }, callback) => {
     console.log("[deleteConversation] called", { conversation_id, user_id });
+    if (!conversation_id || !user_id) {
+      callback && callback({ error: true, message: "Missing conversation_id or user_id" });
+      return;
+    }
     try {
       // Validate conversation and permissions
       const { data: convo, error: convoErr } = await supabase
