@@ -25,27 +25,6 @@ const allowedOrigins = process.env.FRONTEND_URL
       "agropeer://localhost",
     ];
 
-// const allowedOrigins = "https://localhost" || "http://localhost:3000" ||  "http://192.168.31.74:3000" || "capacitor://localhost" || "agropeer://localhost";
-
-
-// const io = new Server(server, {
-//   transports: ["websocket", "polling"],
-//   cors: {
-//     origin: (origin, callback) => {
-//       if (!origin) return callback(null, true);
-
-//       const normalizedOrigin = normalize(origin);
-
-//       if (allowedOrigins.includes(normalizedOrigin)) {
-//         return callback(null, true);
-//       }
-
-//       console.log("❌ Blocked CORS origin:", origin);
-//       callback(new Error("Not allowed by CORS"));
-//     },
-//     credentials: true,
-//   },
-// });
 
 const io = new Server(server, {
   transports: ["websocket", "polling"],
@@ -224,7 +203,8 @@ io.on("connection", (socket) => {
         const activity = userActivity.get(recipientId) || {};
 
         const isInChatsPage = activity.page === "chats";
-        const isReadingConversation = activity.activeConversation === conversation_id;
+        // Normalize both to strings for comparison to handle type mismatches (string vs UUID/number)
+        const isReadingConversation = String(activity.activeConversation) === String(conversation_id);
 
         const shouldSendNotification =
           !recipientOnline ||       // User offline
